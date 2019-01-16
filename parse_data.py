@@ -107,13 +107,12 @@ class DataParser:
 
 
 
-                # NOTE: dataset od starts at 1
-                # if 0 0 x x means the mention is the first token 
-                # if 0 0 0 x means no mention
+                ## NOTE: index starts from 0
+                ## -1 - 1 means no mention
                 for splits in range(len(sample_text_tokens) // (max_length_token // 2) - 2):
                     if splits not in pos_splits and random.randint(0, 1000) < pos_neg_sample_ratio:
                         golden_data.write(
-                            str(0) + ' ' + str(0) +
+                            str(-1) + ' ' + str(-1) +
                             ' ' + str(0) + ' ' + str(row['publication_id']) +
                             ' ' + ' '.join(sample_text_tokens[splits * (max_length_token // 2):(splits + 2) * (
                                                 max_length_token // 2)])
@@ -198,6 +197,10 @@ class TestDataGenerator:
             row = self.data_set_citations.loc[i]
             self.publication_dataset[row['publication_id']].append(row['data_set_id'])   
         logger.info(str(len(self.publication_dataset)) + ' publications loaded')     
+
+        ## for reproductivity
+        ## same seed ensures same test set generated
+        np.random.seed(2019)
         
         
     def _extract(self, dir_name='files/text/', extension='.txt'):
@@ -275,7 +278,7 @@ class TestDataGenerator:
             res_line = list(set(res_line))
             if len(res_line)==0:
                 # no mentions at all
-                res_line.append((0, 0, 0, pub_id))
+                res_line.append((-1, -1, 0, pub_id))
             i = 0
             for c in res_line:
                 if i > 0:
@@ -337,7 +340,7 @@ class TestDataGenerator:
             res_line = list(set(res_line))
             if len(res_line)==0:
                 # no mentions at all
-                res_line.append((0, 0, 0, pub_id))
+                res_line.append((-1, -1, 0, pub_id))
             i = 0
             for c in res_line:
                 if i > 0:
