@@ -44,11 +44,11 @@ class DataParser:
         ## avoid taking docs from test set
         test_doc_ids = []
         zero_shot_doc_ids = []
-        with open('./test_docs/test_doc_ids') as f:
+        with open('../data/test_docs/test_doc_ids') as f:
             fl = f.readlines()
             test_doc_ids = [int(line.strip()) for line in fl]
 
-        with open('./test_docs/zero_shot_doc_ids') as f:
+        with open('../data/test_docs/zero_shot_doc_ids') as f:
             fl = f.readlines()
             zero_shot_doc_ids = [int(line.strip()) for line in fl]
 
@@ -70,7 +70,7 @@ class DataParser:
                 pos_splits = []
                 for mention_text in row['mention_list']:
                     mention_text = re.sub('\d', '0', mention_text)
-                    mention_text = re.sub('[^ ]- ', '', mention_text)
+                    # mention_text = re.sub('[^ ]- ', '', mention_text)
                     mention_text_spans = list(WordPunctTokenizer().span_tokenize(mention_text))
 
                     index_finder_lower = findall_lower(mention_text, sample_text)
@@ -80,22 +80,22 @@ class DataParser:
                     for find_index in all_found_indices:
                       try:
                         if find_index != -1:
-                            mention_text_spans = [(indices[0] + find_index, indices[1] + find_index) for indices in mention_text_spans]
+                            new_mention_text_spans = [(indices[0] + find_index, indices[1] + find_index) for indices in mention_text_spans]
                             #write to training sample pointers here
 
-                            for splits in range(len(sample_text_tokens) // (max_length_token//2) - 2):
-                                if sample_text_spans.index(mention_text_spans[0]) > splits*(max_length_token//2) and \
-                                  sample_text_spans.index(mention_text_spans[-1]) < (splits+2)*(max_length_token//2):
+                            for splits in range(len(sample_text_tokens) // max_length_token - 1):
+                                if sample_text_spans.index(new_mention_text_spans[0]) > splits*(max_length_token) and \
+                                  sample_text_spans.index(new_mention_text_spans[-1]) < (splits+1)*(max_length_token):
 
                                     pos_splits.append(splits)
                                     pos_count += 1
 
                                     #TODO Wrapper over full data reader
                                     golden_data.write(
-                                        str(sample_text_spans.index(mention_text_spans[0]) - splits*(max_length_token//2)) +
-                                        ' ' + str(sample_text_spans.index(mention_text_spans[-1]) - splits*(max_length_token//2)) +
+                                        str(sample_text_spans.index(new_mention_text_spans[0]) - splits*(max_length_token)) +
+                                        ' ' + str(sample_text_spans.index(new_mention_text_spans[-1]) - splits*(max_length_token)) +
                                         ' ' + str(row['data_set_id']) + ' ' + str(row['publication_id']) +
-                                         ' ' + ' '.join(sample_text_tokens[splits*(max_length_token//2):(splits+2)*(max_length_token//2)])
+                                         ' ' + ' '.join(sample_text_tokens[splits*(max_length_token):(splits+1)*(max_length_token)])
                                         + '\n'
                                     )
                         else:
@@ -109,13 +109,13 @@ class DataParser:
 
                 ## NOTE: index starts from 0
                 ## -1 - 1 means no mention
-                for splits in range(len(sample_text_tokens) // (max_length_token // 2) - 2):
+                for splits in range(len(sample_text_tokens) // (max_length_token) - 1):
                     if splits not in pos_splits and random.randint(0, 1000) < pos_neg_sample_ratio:
                         golden_data.write(
                             str(-1) + ' ' + str(-1) +
                             ' ' + str(0) + ' ' + str(row['publication_id']) +
-                            ' ' + ' '.join(sample_text_tokens[splits * (max_length_token // 2):(splits + 2) * (
-                                                max_length_token // 2)])
+                            ' ' + ' '.join(sample_text_tokens[splits * (max_length_token):(splits + 1) * (
+                                                max_length_token)])
                             + '\n'
                         )
 
@@ -249,7 +249,7 @@ class TestDataGenerator:
         for pub_id in zero_shot_pub_ids:
             pub_text = self.full_text[str(pub_id)+'.txt']
             zero_shot_docs.write(pub_text+'\n')
-            pub_text_tokens = pub_text_tokens = list(WordPunctTokenizer().tokenize(pub_text))
+            pub_text_tokens = list(WordPunctTokenizer().tokenize(pub_text))
             pub_text_spans = list(WordPunctTokenizer().span_tokenize(pub_text))
             
             res_line = []
@@ -258,7 +258,7 @@ class TestDataGenerator:
                 d_row = self.data_set_citations.loc[idx]
                 for mention_text in d_row['mention_list']:
                     mention_text = re.sub('\d', '0', mention_text)
-                    mention_text = re.sub('[^ ]- ', '', mention_text)
+                    # mention_text = re.sub('[^ ]- ', '', mention_text)
                     mention_text_spans = list(WordPunctTokenizer().span_tokenize(mention_text))
                     
                     index_finder_lower = findall_lower(mention_text, pub_text)
@@ -267,11 +267,10 @@ class TestDataGenerator:
                     for find_index in found_indices:
                         try:
                             if find_index != -1:
-                                mention_text_spans = [(indices[0] + find_index, indices[1] + find_index) for indices in mention_text_spans]
+                                new_mention_text_spans = [(indices[0] + find_index, indices[1] + find_index) for indices in mention_text_spans]
 
-                                res_line.append((pub_text_spans.index(mention_text_spans[0]), 
-
-                                                 pub_text_spans.index(mention_text_spans[-1]), 
+                                res_line.append((pub_text_spans.index(new_mention_text_spans[0]), 
+                                                 pub_text_spans.index(new_mention_text_spans[-1]), 
                                                  d_row['data_set_id'], d_row['publication_id']))
                         except:
                             pass
@@ -311,7 +310,7 @@ class TestDataGenerator:
         for pub_id in test_doc_list:
             pub_text = self.full_text[str(pub_id)+'.txt']
             test_docs.write(pub_text+'\n')
-            pub_text_tokens = pub_text_tokens = list(WordPunctTokenizer().tokenize(pub_text))
+            pub_text_tokens = list(WordPunctTokenizer().tokenize(pub_text))
             pub_text_spans = list(WordPunctTokenizer().span_tokenize(pub_text))
             
             res_line = []
@@ -320,7 +319,7 @@ class TestDataGenerator:
                 d_row = self.data_set_citations.loc[idx]
                 for mention_text in d_row['mention_list']:
                     mention_text = re.sub('\d', '0', mention_text)
-                    mention_text = re.sub('[^ ]- ', '', mention_text)
+                    # mention_text = re.sub('[^ ]- ', '', mention_text)
                     mention_text_spans = list(WordPunctTokenizer().span_tokenize(mention_text))
                     
                     index_finder_lower = findall_lower(mention_text, pub_text)
@@ -329,11 +328,10 @@ class TestDataGenerator:
                     for find_index in found_indices:
                         try:
                             if find_index != -1:
-                                mention_text_spans = [(indices[0] + find_index, indices[1] + find_index) for indices in mention_text_spans]
+                                new_mention_text_spans = [(indices[0] + find_index, indices[1] + find_index) for indices in mention_text_spans]
 
-                                res_line.append((pub_text_spans.index(mention_text_spans[0]), 
-
-                                                 pub_text_spans.index(mention_text_spans[-1]), 
+                                res_line.append((pub_text_spans.index(new_mention_text_spans[0]), 
+                                                 pub_text_spans.index(new_mention_text_spans[-1]), 
                                                  d_row['data_set_id'], d_row['publication_id']))
                         except:
                             pass
@@ -358,11 +356,15 @@ class TestDataGenerator:
 
 
 if __name__ == '__main__':
-    test_parser = TestDataGenerator()
-    test_parser.get_zero_shot_docs()
-    test_parser.get_test_docs()
+    # test_parser = TestDataGenerator()
+    # test_parser.get_zero_shot_docs()
+    # test_parser.get_test_docs()
 
-    for i in [1, 10, 100, 200]:
+    # for i in [1, 10, 100, 200]:
+    #     data_parser = DataParser(outdir='../data/data_30_'+str(i)+'neg/')
+    #     data_parser.get_train_data(30, i)   
+
+    for i in [300, 400]:
         data_parser = DataParser(outdir='../data/data_30_'+str(i)+'neg/')
         data_parser.get_train_data(30, i)   
 
