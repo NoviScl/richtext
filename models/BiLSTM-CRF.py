@@ -11,6 +11,8 @@ from keras.callbacks import EarlyStopping
 from sklearn import metrics
 import re
 import os
+from keras_contrib.layers import CRF
+import keras
 
 ## prepare data for doc evaluation
 def get_doc_test(gold, text):
@@ -59,8 +61,7 @@ def doc_pred(model, doc, tokenizer, MAXLEN=40):
     splits = tokenizer.texts_to_sequences(splits)
     splits = pad_sequences(splits, maxlen=MAXLEN)
     preds = model.predict(splits)
-    preds = np.squeeze(preds)
-    preds = [1 if p>=threshold else 0 for pd in preds for p in pd]
+    preds = [np.argmax(y) for x in preds for y in x]
     return preds
 
 
@@ -122,28 +123,38 @@ def prep_data(neg_ratio=0, val_ratio=0.05, data_dir='../../data/data_40/', maxle
 
 def run(X_train, Y_train, X_val, Y_val, embedding_matrix, vocab_size, maxlen=40, emb_dim=300, neg_ratio=0, hidden_dim=300, drop=0.2, r_drop=0.1):
     ##build model
+#     input = Input(shape=(maxlen,))
+#     model = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)(input)
+#     model = Dropout(drop)(model)
+#     model = Bidirectional(LSTM(hidden_dim, return_sequences=True, recurrent_dropout=r_drop))(model)
+#     model = Dropout(drop)(model)
+#     out = TimeDistributed(Dense(1, activation='sigmoid'))(model)
     input = Input(shape=(maxlen,))
     model = Embedding(vocab_size, emb_dim, weights=[embedding_matrix], input_length=maxlen, trainable=False)(input)
-    model = Dropout(drop)(model)
     model = Bidirectional(LSTM(hidden_dim, return_sequences=True, recurrent_dropout=r_drop))(model)
-    model = Dropout(drop)(model)
-    out = TimeDistributed(Dense(1, activation='sigmoid'))(model)
+    model = TimeDistributed(Dense(hidden_dim//4, activation='relu'))(model)
+    model = TimeDistributed(Dropout(drop))(model)
+    ##use CRF instead of Dense
+    crf = CRF(2)
+    out = crf(model)
 
     model = Model(input, out)
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc'])
+    
+    Y_train_2 = keras.utils.to_categorical(Y_train)
+    Y_val_2 = keras.utils.to_categorical(Y_val)
+    
+    model.compile(optimizer='adam', loss=crf.loss_function, metrics=[crf.accuracy]) 
     earlyStop = [EarlyStopping(monitor='val_loss', patience=1)]
-    history = model.fit(X_train, Y_train, batch_size=64, epochs=10, validation_data=(X_val, Y_val), 
-        callbacks=earlyStop) 
+    history = model.fit(X_train, Y_train_2, batch_size=64, epochs=10, 
+                       validation_data=(X_val, Y_val_2), callbacks=earlyStop)
 
 
-    pred = model.predict(X_val)
-    Y_pred = np.squeeze(pred)
-    test = [[1 if y>=threshold else 0 for y in x] for x in Y_pred]
+    preds = model.predict(X_val)
+    test = [[np.argmax(y) for y in x] for x in preds]
     test_arr = np.asarray(test)
     test_arr = np.reshape(test_arr, (-1))
-    target = np.reshape(Y_val, (-1))
 
-    print (metrics.precision_recall_fscore_support(target, test_arr, average=None,
+    print (metrics.precision_recall_fscore_support(np.reshape(Y_val,(-1)), test_arr, average=None,
                                               labels=[0, 1]))
 
     
@@ -160,7 +171,8 @@ def run(X_train, Y_train, X_val, Y_val, embedding_matrix, vocab_size, maxlen=40,
 
 def doc_eval(model, tokenizer, doc_test, doc_out_dir, gold_dir, MAXLEN=40):
     doc_preds = [doc_pred(model, d, tokenizer, MAXLEN) for d in doc_test]
-    doc_preds = [[int(a) for a in x] for x in doc_preds]
+#     doc_preds = [[np.argmax(y) for y in x] for x in doc_preds]
+#     doc_preds = [[int(a) for a in x] for x in doc_preds]
 
     with open(doc_out_dir, 'w') as fout:
         for i in range(len(doc_preds)):
@@ -219,15 +231,14 @@ if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
 if __name__=='__main__':
-    X_train, Y_train, X_val, Y_val, embedding_matrix, vocab_size, tokenizer = prep_data(neg_ratio=neg_ratio)
-    neg_ratio = 0.025
-    hidden_dim = 100
-    drop = 0.1
-    r_drop=0.0
-    model, history, p, r, f = run(X_train, Y_train, X_val, Y_val, embedding_matrix, vocab_size, neg_ratio=neg_ratio, hidden_dim=hidden_dim, drop=drop, r_drop=r_drop)
-    doc_eval(model, tokenizer, doc_tests, out_dir+'doc_40_'+str(neg_ratio)+'neg', '../../data/all_test_docs/test_doc_gold')
-    doc_eval(model, tokenizer, zero_shot_tests, out_dir+'zeroshot_40_'+str(neg_ratio)+'neg', '../../data/all_test_docs/zero_shot_doc_gold')
-
+	X_train, Y_train, X_val, Y_val, embedding_matrix, vocab_size, tokenizer = prep_data(neg_ratio=neg_ratio)
+	neg_ratio = 0.025
+	hidden_dim = 100
+	drop = 0.1
+	r_drop=0.1
+	model, history, p, r, f = run(X_train, Y_train, X_val, Y_val, embedding_matrix, vocab_size, neg_ratio=neg_ratio, hidden_dim=hidden_dim, drop=drop, r_drop=r_drop)
+	doc_eval(model, tokenizer, doc_tests, out_dir+'doc_40_'+str(neg_ratio)+'neg', '../../data/all_test_docs/test_doc_gold')
+	doc_eval(model, tokenizer, zero_shot_tests, out_dir+'zeroshot_40_'+str(neg_ratio)+'neg', '../../data/all_test_docs/zero_shot_doc_gold')
 
 
 

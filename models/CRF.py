@@ -8,7 +8,7 @@ import re
 import os
 
 ## prepare data for doc evaluation
-doc_dir = "../../data/test_docs/"
+doc_dir = "../../data/all_test_docs/"
 def get_doc_test(gold, text):
     ## gold: gold data
     ## text: full text file
@@ -104,9 +104,11 @@ def sent2tokens(sent):
 
 
 ## train and return a model
-def run(train_dir, val_dir):
-    train_sents = get_sents(train_dir)
-    val_sents = get_sents(val_dir)
+def run(neg_ratio=0, val_ratio=0.05, data_dir='../../data/data_40/'):
+    train_sents, val_sents = data_sampler(neg_ratio, val_ratio, data_dir)
+
+    train_sents = get_sents(train_sents)
+    val_sents = get_sents(val_sents)
 
     X_train = [sent2features(s) for s in train_sents]
     Y_train = [sent2labels(s) for s in train_sents]
@@ -127,14 +129,17 @@ def run(train_dir, val_dir):
     Y_pred = crf.predict(X_val)
 
     ## print validation f1 score
-    print ('evaluating on: '+val_dir)
+    print ('evaluating: neg ratio: {}, val ratio: {}'.format(neg_ratio, val_ratio))
     print (metrics.flat_classification_report(
         Y_val, Y_pred, labels=sorted_labels, digits=3
     ))
 
-    return crf  
+    print ("Evaluate: dev seg exact")
+    p, r, f = seg_exact_match(Y_pred, Y_val, out+'seg_'+str(neg_ratio)+'neg', '../../data/val_segs/'+'seg_'+str(neg_ratio)+'neg')
 
-def doc_eval(model, doc_test, doc_out_dir, gold_dir, MAXLEN=30):
+    return crf
+
+def doc_eval(model, doc_test, doc_out_dir, gold_dir, MAXLEN=40):
     '''
     model: trained model 
     doc_test: processed doc test input
@@ -165,7 +170,7 @@ def doc_eval(model, doc_test, doc_out_dir, gold_dir, MAXLEN=30):
                     j+=1
                     first += 1
             if no_mention:
-                fout.write("-1 -1"'\n')
+                fout.write("-1 -1"+'\n')
             else:
                 fout.write(string+'\n')
     print ('evaluating data from: ', doc_out_dir)
@@ -182,19 +187,33 @@ if __name__=='__main__':
     zero_shot_tests = [read_doc(zero_shot_x[d], zero_shot_y[d]) for d in range(len(zero_shot_x))]
     zero_shot_tests = [sent2features(s) for s in zero_shot_tests]
 
-    for i in [400, 300]:
-        DIR = '../../data/data_30_'+str(i)+'neg/'
+    # 0.01, 0.05, 0.10, 0.20, 0.40, 0.80
+    # 0.00, 0.20, 0.40, 0.60, 0.80, 1.00
+    for i in [0, 0.0125, 0.025, 0.05, 0.1, 0.2, 0.4]:
+        MAXLEN = 30
+        DIR = '../../data/data_30/'
         out = '../../outputs/'
         if not os.path.exists(out):
             os.makedirs(out)
-        crf = run(DIR+'train.txt', DIR+'validate.txt')
-        doc_eval(crf, doc_tests, out+'doc_30_'+str(i)+'neg', '../../data/test_docs/test_doc_gold')
-        doc_eval(crf, zero_shot_tests, out+'zeroshot_30_'+str(i)+'neg', '../../data/test_docs/zero_shot_doc_gold')
+        crf = run(neg_ratio=i, val_ratio=0.05, data_dir=DIR)
+        print ("Evaluate on doc tests")
+        doc_eval(crf, doc_tests, out+'doc_'+str(MAXLEN)+'_'+str(i)+'neg', '../../data/all_test_docs/test_doc_gold', MAXLEN)
+        print ("Evaluate on zero shot tests")
+        doc_eval(crf, zero_shot_tests, out+'zeroshot_'+str(MAXLEN)+'_'+str(i)+'neg', '../../data/all_test_docs/zero_shot_doc_gold', MAXLEN)
 
-
-
-
-
+    # for LEN in [20, 30, 40, 60, 80]:
+    #     i = 0
+    #     MAXLEN = LEN
+    #     print ("LEN: ", MAXLEN)
+    #     DIR = '../../data/data_'+str(LEN)+'/'
+    #     out = '../../outputs/'
+    #     if not os.path.exists(out):
+    #         os.makedirs(out)
+    #     crf = run(neg_ratio=i, val_ratio=0.05, data_dir=DIR)
+    #     print ("Evaluate on doc tests")
+    #     doc_eval(crf, doc_tests, out+'doc_'+str(MAXLEN)+'_'+str(i)+'neg', '../../data/all_test_docs/test_doc_gold', MAXLEN)
+    #     print ("Evaluate on zero shot tests")
+    #     doc_eval(crf, zero_shot_tests, out+'zeroshot_'+str(MAXLEN)+'_'+str(i)+'neg', '../../data/all_test_docs/zero_shot_doc_gold', MAXLEN)
 
 
 

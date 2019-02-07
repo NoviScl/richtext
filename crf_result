@@ -1,0 +1,145 @@
+26954 pos data sampled
+0 neg data sampled
+evaluating: neg ratio: 0.0, val ratio: 0.05
+             precision    recall  f1-score   support
+
+          0      0.989     0.991     0.990   1465248
+          1      0.777     0.733     0.754     59265
+
+avg / total      0.981     0.981     0.981   1524513
+
+Evaluate: dev seg exact
+Segment Exact mention match: 
+ precision: 0.5204794867465812, recall: 0.6019682886823401, f1: 0.5582658771119683
+Evaluate on doc tests
+evaluating data from:  ../../outputs/doc_60_0.0neg
+Doc exact: 
+ precision: 0.4477747502270663, recall: 0.3489030431705591, f1: 0.3922036595067621
+doc exact:  (0.4477747502270663, 0.3489030431705591, 0.3922036595067621)
+Doc Token wise: 
+ precision: 0.585442453353039, recall: 0.5083413538658967, f1: 0.5441744655276036
+doc partial:  (0.585442453353039, 0.5083413538658967, 0.5441744655276036)
+Evaluate on zero shot tests
+evaluating data from:  ../../outputs/zeroshot_60_0.0neg
+Doc exact: 
+ precision: 0.2583102493074792, recall: 0.16063738156761412, f1: 0.19808815719596384
+doc exact:  (0.2583102493074792, 0.16063738156761412, 0.19808815719596384)
+Doc Token wise: 
+ precision: 0.3850789692435578, recall: 0.316968867601779, f1: 0.3477200225182961
+doc partial:  (0.3850789692435578, 0.316968867601779, 0.3477200225182961)
+26954 pos data sampled
+60482 neg data sampled
+evaluating: neg ratio: 0.2, val ratio: 0.05
+             precision    recall  f1-score   support
+
+          0      0.996     0.997     0.997   4871583
+          1      0.765     0.692     0.727     59210
+
+avg / total      0.993     0.994     0.994   4930793
+
+Evaluate: dev seg exact
+Segment Exact mention match: 
+ precision: 0.8264524846119201, recall: 0.861564576711933, f1: 0.8436433509964223
+Evaluate on doc tests
+evaluating data from:  ../../outputs/doc_60_0.2neg
+Doc exact: 
+ precision: 0.476905311778291, recall: 0.2922859164897382, f1: 0.3624396665204037
+doc exact:  (0.476905311778291, 0.2922859164897382, 0.3624396665204037)
+Doc Token wise: 
+ precision: 0.6528344671201814, recall: 0.4618222649983959, f1: 0.5409620443442316
+doc partial:  (0.6528344671201814, 0.4618222649983959, 0.5409620443442316)
+Evaluate on zero shot tests
+evaluating data from:  ../../outputs/zeroshot_60_0.2neg
+Doc exact: 
+ precision: 0.30939226519337015, recall: 0.14470284237726097, f1: 0.1971830985915493
+doc exact:  (0.30939226519337015, 0.14470284237726097, 0.1971830985915493)
+Doc Token wise: 
+ precision: 0.41428967045139853, recall: 0.25590147109134453, f1: 0.3163794015015333
+doc partial:  (0.41428967045139853, 0.25590147109134453, 0.3163794015015333)
+26954 pos data sampled
+120964 neg data sampled
+evaluating: neg ratio: 0.4, val ratio: 0.05
+             precision    recall  f1-score   support
+
+          0      0.998     0.998     0.998   8279030
+          1      0.760     0.665     0.709     59123
+
+avg / total      0.996     0.996     0.996   8338153
+
+Evaluate: dev seg exact
+Segment Exact mention match: 
+ precision: 0.8935519308052786, recall: 0.9145614209874611, f1: 0.9039346153305106
+Evaluate on doc tests
+evaluating data from:  ../../outputs/doc_60_0.4neg
+Doc exact: 
+ precision: 0.4911206368646663, recall: 0.283793347487615, f1: 0.3597219107423189
+doc exact:  (0.4911206368646663, 0.283793347487615, 0.3597219107423189)
+Doc Token wise: 
+ precision: 0.664447731755424, recall: 0.43230670516522296, f1: 0.5238095238095238
+doc partial:  (0.664447731755424, 0.43230670516522296, 0.5238095238095238)
+Evaluate on zero shot tests
+evaluating data from:  ../../outputs/zeroshot_60_0.4neg
+Doc exact: 
+ precision: 0.312157721796276, recall: 0.1227390180878553, f1: 0.17619783616692425
+doc exact:  (0.312157721796276, 0.1227390180878553, 0.17619783616692425)
+Doc Token wise: 
+ precision: 0.39481481481481484, recall: 0.1823469038658912, f1: 0.24947343786566814
+doc partial:  (0.39481481481481484, 0.1823469038658912, 0.24947343786566814)
+26954 pos data sampled
+181446 neg data sampled
+evaluating: neg ratio: 0.6, val ratio: 0.05
+             precision    recall  f1-score   support
+
+          0      0.998     0.999     0.999  11685522
+          1      0.753     0.648     0.696     59272
+
+avg / total      0.997     0.997     0.997  11744794
+
+Evaluate: dev seg exact
+Segment Exact mention match: 
+ precision: 0.9214234238711762, recall: 0.9364329730275786, f1: 0.9288675676691259
+Evaluate on doc tests
+evaluating data from:  ../../outputs/doc_60_0.6neg
+Doc exact: 
+ precision: 0.4942381562099872, recall: 0.27317763623496105, f1: 0.3518687329079307
+doc exact:  (0.4942381562099872, 0.27317763623496105, 0.3518687329079307)
+Doc Token wise: 
+ precision: 0.6838976479710519, recall: 0.424446583253128, f1: 0.5238048104523408
+doc partial:  (0.6838976479710519, 0.424446583253128, 0.5238048104523408)
+Evaluate on zero shot tests
+evaluating data from:  ../../outputs/zeroshot_60_0.6neg
+Doc exact: 
+ precision: 0.3090909090909091, recall: 0.10981912144702842, f1: 0.16205910390848427
+doc exact:  (0.3090909090909091, 0.10981912144702842, 0.16205910390848427)
+Doc Token wise: 
+ precision: 0.46128423040604344, recall: 0.1671228190215532, f1: 0.24535409342039177
+doc partial:  (0.46128423040604344, 0.1671228190215532, 0.24535409342039177)
+26954 pos data sampled
+241928 neg data sampled
+evaluating: neg ratio: 0.8, val ratio: 0.05
+             precision    recall  f1-score   support
+
+          0      0.999     0.999     0.999  15093820
+          1      0.747     0.656     0.699     59550
+
+avg / total      0.998     0.998     0.998  15153370
+
+Evaluate: dev seg exact
+Segment Exact mention match: 
+ precision: 0.9384049990145727, recall: 0.9506531943297173, f1: 0.9444893895077479
+Evaluate on doc tests
+evaluating data from:  ../../outputs/doc_60_0.8neg
+Doc exact: 
+ precision: 0.48812351543942994, recall: 0.2908704883227176, f1: 0.36452328159645236
+doc exact:  (0.48812351543942994, 0.2908704883227176, 0.36452328159645236)
+Doc Token wise: 
+ precision: 0.6617046818727491, recall: 0.4420917548925249, f1: 0.5300509664390807
+doc partial:  (0.6617046818727491, 0.4420917548925249, 0.5300509664390807)
+Evaluate on zero shot tests
+evaluating data from:  ../../outputs/zeroshot_60_0.8neg
+Doc exact: 
+ precision: 0.3049482163406214, recall: 0.11412575366063739, f1: 0.16609213412723287
+doc exact:  (0.3049482163406214, 0.11412575366063739, 0.16609213412723287)
+Doc Token wise: 
+ precision: 0.46335190741534504, recall: 0.18491276086212796, f1: 0.26433549333659373
+doc partial:  (0.46335190741534504, 0.18491276086212796, 0.26433549333659373)

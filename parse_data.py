@@ -1,6 +1,6 @@
 import pandas as pd
 import os, sys, random
-from nltk.tokenize import  WordPunctTokenizer
+from nltk.tokenize import  TreebankWordTokenizer, SpaceTokenizer
 from collections import Counter
 import json, codecs, re
 import logging
@@ -33,22 +33,21 @@ class DataParser:
             os.makedirs(outdir) 
 
 
-    def get_train_data(self,  MAX_LENGTH=30, neg_ratio=1):
+    def get_train_data(self,  MAX_LENGTH=60, full_neg=True):
         ## MAX_LENGTH: max length of segments to be split into
-        ## neg ratio: how many neg data to use (out of 1000), should be an integer
-        logger.info('Using neg ratio: '+str(neg_ratio)+'/1000')
+        ## neg ratio: how many neg data to use (out of 100), should be an integer
+        ## full_neg: whether to extract all neg data
 
         max_length_token = MAX_LENGTH
-        pos_neg_sample_ratio = neg_ratio #5 out of 1000
 
         ## avoid taking docs from test set
         test_doc_ids = []
         zero_shot_doc_ids = []
-        with open('../data/test_docs/test_doc_ids') as f:
+        with open('../data/all_test_docs/test_doc_ids') as f:
             fl = f.readlines()
             test_doc_ids = [int(line.strip()) for line in fl]
 
-        with open('../data/test_docs/zero_shot_doc_ids') as f:
+        with open('../data/all_test_docs/zero_shot_doc_ids') as f:
             fl = f.readlines()
             zero_shot_doc_ids = [int(line.strip()) for line in fl]
 
@@ -57,21 +56,39 @@ class DataParser:
 
         pos_count = 0
         neg_count = 0
+        pos_tokens = 0
+        neg_tokens = 0
 
-        with codecs.open(self.outdir + 'golden_data', 'w') as golden_data:
+        sampled = []
+        with codecs.open(self.outdir + 'pos_data', 'w') as pos_data, codecs.open(self.outdir+'neg_data', 'w') as neg_data:
             for index, row in self.data_set_citations.iterrows():
                 pub_id = row['publication_id']
                 if pub_id in zero_shot_doc_ids or pub_id in test_doc_ids:
                     continue
+
+                if pub_id in sampled:
+                    continue
+                else:
+                    sampled.append(pub_id)
+
+                pub_ids = list(self.data_set_citations['publication_id'])
+                rows = [pub_ids.index(i) for i in pub_ids if i==pub_id]
+                mention_list = []
+                for r in rows:
+                    d_row = self.data_set_citations.loc[r]
+                    mention_list.extend(d_row['mention_list'])
+                mention_list = set(mention_list)
+                logger.info('pub id: {}, mentions: {}'.format(pub_id, len(mention_list)))
+    
                 sample_text = self.full_text[str(pub_id)+'.txt']
-                sample_text_tokens = list(WordPunctTokenizer().tokenize(sample_text))
-                sample_text_spans = list(WordPunctTokenizer().span_tokenize(sample_text))
+                sample_text_tokens = list(SpaceTokenizer().tokenize(sample_text))
+                sample_text_spans = list(SpaceTokenizer().span_tokenize(sample_text))
 
                 pos_splits = []
-                for mention_text in row['mention_list']:
-                    mention_text = re.sub('\d', '0', mention_text)
+                for mention_text in mention_list:
+                    mention_text = re.sub('\d', ' ', mention_text)
                     # mention_text = re.sub('[^ ]- ', '', mention_text)
-                    mention_text_spans = list(WordPunctTokenizer().span_tokenize(mention_text))
+                    mention_text_spans = list(SpaceTokenizer().span_tokenize(mention_text))
 
                     index_finder_lower = findall_lower(mention_text, sample_text)
 
@@ -80,6 +97,7 @@ class DataParser:
                     for find_index in all_found_indices:
                       try:
                         if find_index != -1:
+                            # logger.info('Found: '+mention_text)
                             new_mention_text_spans = [(indices[0] + find_index, indices[1] + find_index) for indices in mention_text_spans]
                             #write to training sample pointers here
 
@@ -89,13 +107,15 @@ class DataParser:
 
                                     pos_splits.append(splits)
                                     pos_count += 1
+                                    pos_tokens += len(new_mention_text_spans)
+                                    neg_tokens += (MAX_LENGTH - len(new_mention_text_spans))
 
                                     #TODO Wrapper over full data reader
-                                    golden_data.write(
+                                    pos_data.write(
                                         str(sample_text_spans.index(new_mention_text_spans[0]) - splits*(max_length_token)) +
                                         ' ' + str(sample_text_spans.index(new_mention_text_spans[-1]) - splits*(max_length_token)) +
                                         ' ' + str(row['data_set_id']) + ' ' + str(row['publication_id']) +
-                                         ' ' + ' '.join(sample_text_tokens[splits*(max_length_token):(splits+1)*(max_length_token)])
+                                         ' ' + ' '.join(sample_text_tokens[splits*(max_length_token):(splits+1)*(max_length_token)+1])
                                         + '\n'
                                     )
                         else:
@@ -106,12 +126,13 @@ class DataParser:
                         pass
 
 
-
+                if not full_neg:
+                    continue
                 ## NOTE: index starts from 0
                 ## -1 - 1 means no mention
                 for splits in range(len(sample_text_tokens) // (max_length_token) - 1):
-                    if splits not in pos_splits and random.randint(0, 1000) < pos_neg_sample_ratio:
-                        golden_data.write(
+                    if splits not in pos_splits:
+                        neg_data.write(
                             str(-1) + ' ' + str(-1) +
                             ' ' + str(0) + ' ' + str(row['publication_id']) +
                             ' ' + ' '.join(sample_text_tokens[splits * (max_length_token):(splits + 1) * (
@@ -120,32 +141,36 @@ class DataParser:
                         )
 
                         neg_count += 1
+                        neg_tokens += MAX_LENGTH
 
         logger.info(str(pos_count)+" mentions added.")
         logger.info(str(neg_count)+" no mentions added.")
+        logger.info(str(pos_tokens)+" pos tokens added.")
+        logger.info(str(neg_tokens)+" neg tokens added.")
+        logger.info("neg token percentage: {}".format(neg_tokens*100/(pos_tokens+neg_tokens)))
 
-        train = 0
-        val = 0
-        with codecs.open(self.outdir + 'golden_data', 'r') as golden_data, \
-            codecs.open(self.outdir + 'train.txt', 'w') as train_split, \
-            codecs.open(self.outdir + 'validate.txt', 'w') as validate_split:
-            all_lines = golden_data.readlines()
-            for i, line in enumerate(all_lines):
-                if i%10 == 0:
-                    validate_split.write(line)
-                    val += 1
-                else:
-                    train_split.write(line)
-                    train += 1
+        # train = 0
+        # val = 0
+        # with codecs.open(self.outdir + 'golden_data', 'r') as golden_data, \
+        #     codecs.open(self.outdir + 'train.txt', 'w') as train_split, \
+        #     codecs.open(self.outdir + 'validate.txt', 'w') as validate_split:
+        #     all_lines = golden_data.readlines()
+        #     for i, line in enumerate(all_lines):
+        #         if i%10 == 0:
+        #             validate_split.write(line)
+        #             val += 1
+        #         else:
+        #             train_split.write(line)
+        #             train += 1
 
-        logger.info(str(train)+' training segments sampled')
-        logger.info(str(val)+' validation segments sampled')
+        # logger.info(str(train)+' training segments sampled')
+        # logger.info(str(val)+' validation segments sampled')
 
 
 
     def get_vocab(self, start_index=2, min_count=10):
         text = ''.join(list(self.publications['full_text'].values))
-        all_words = WordPunctTokenizer().tokenize(text + text.lower())
+        all_words = SpaceTokenizer().tokenize(text + text.lower())
         vocab = Counter(all_words).most_common()
         vocab_out_json = {}
         for items in vocab:
@@ -172,7 +197,7 @@ class DataParser:
                         #TODO document structure
                         #text = ' '.join([s.strip() for s in lines])
                         text = ' '.join([s.strip() for s in lines])
-                        text = re.sub('\d', '0', text)
+                        text = re.sub('\d', ' ', text)
                         text = re.sub('[^ ]- ', '', text)
                         full_text[item] = text
                     except:
@@ -213,7 +238,7 @@ class TestDataGenerator:
                     try:
                         lines = f.readlines()
                         text = ' '.join([s.strip() for s in lines])
-                        text = re.sub('\d', '0', text)
+                        text = re.sub('\d', ' ', text)
                         text = re.sub('[^ ]- ', '', text)
                         full_text[item] = text
                     except:
@@ -245,21 +270,25 @@ class TestDataGenerator:
         self.zero_shot_doc_ids = zero_shot_pub_ids
         
         pub_ids = list(self.data_set_citations['publication_id'])
+        pos_tokens = 0
+        neg_tokens = 0
         #to locate lines with relevant pubs
         for pub_id in zero_shot_pub_ids:
             pub_text = self.full_text[str(pub_id)+'.txt']
             zero_shot_docs.write(pub_text+'\n')
-            pub_text_tokens = list(WordPunctTokenizer().tokenize(pub_text))
-            pub_text_spans = list(WordPunctTokenizer().span_tokenize(pub_text))
+            pub_text_tokens = list(SpaceTokenizer().tokenize(pub_text))
+            pub_text_spans = list(SpaceTokenizer().span_tokenize(pub_text))
+            cur_pos_tokens = 0
+            cur_neg_tokens = len(pub_text_tokens)
             
             res_line = []
             rows = [pub_ids.index(i) for i in pub_ids if i==pub_id]
             for idx in rows:
                 d_row = self.data_set_citations.loc[idx]
                 for mention_text in d_row['mention_list']:
-                    mention_text = re.sub('\d', '0', mention_text)
+                    mention_text = re.sub('\d', ' ', mention_text)
                     # mention_text = re.sub('[^ ]- ', '', mention_text)
-                    mention_text_spans = list(WordPunctTokenizer().span_tokenize(mention_text))
+                    mention_text_spans = list(SpaceTokenizer().span_tokenize(mention_text))
                     
                     index_finder_lower = findall_lower(mention_text, pub_text)
                     found_indices = [idx for idx in index_finder_lower]
@@ -267,6 +296,7 @@ class TestDataGenerator:
                     for find_index in found_indices:
                         try:
                             if find_index != -1:
+                                cur_pos_tokens += len(mention_text_spans)
                                 new_mention_text_spans = [(indices[0] + find_index, indices[1] + find_index) for indices in mention_text_spans]
 
                                 res_line.append((pub_text_spans.index(new_mention_text_spans[0]), 
@@ -286,11 +316,17 @@ class TestDataGenerator:
                     golden_data.write(str(c[0])+' '+str(c[1])+' '+str(c[2])+' '+str(c[3]))
                 i+=1
             golden_data.write('\n')   
+            pos_tokens += cur_pos_tokens
+            neg_tokens += (cur_neg_tokens - cur_pos_tokens)
 
         zero_shot_doc_ids.close()
         zero_shot_docs.close()
         golden_data.close()
         zero_shot_dataset_ids.close()
+
+        logger.info(str(pos_tokens)+" pos tokens added.")
+        logger.info(str(neg_tokens)+" neg tokens added.")
+        logger.info("neg token percentage: {}".format(neg_tokens*100/(pos_tokens+neg_tokens)))
     
     def get_test_docs(self):
         test_doc_ids = open(self.outdir+'/test_doc_ids', 'w+')
@@ -306,21 +342,25 @@ class TestDataGenerator:
         
         
         pub_ids = list(self.data_set_citations['publication_id'])
+        pos_tokens = 0
+        neg_tokens = 0
         #to locate lines with relevant pubs
         for pub_id in test_doc_list:
             pub_text = self.full_text[str(pub_id)+'.txt']
             test_docs.write(pub_text+'\n')
-            pub_text_tokens = list(WordPunctTokenizer().tokenize(pub_text))
-            pub_text_spans = list(WordPunctTokenizer().span_tokenize(pub_text))
+            pub_text_tokens = list(SpaceTokenizer().tokenize(pub_text))
+            pub_text_spans = list(SpaceTokenizer().span_tokenize(pub_text))
+            cur_pos_tokens = 0
+            cur_neg_tokens = len(pub_text_tokens)
             
             res_line = []
             rows = [pub_ids.index(i) for i in pub_ids if i==pub_id]
             for idx in rows:
                 d_row = self.data_set_citations.loc[idx]
                 for mention_text in d_row['mention_list']:
-                    mention_text = re.sub('\d', '0', mention_text)
+                    mention_text = re.sub('\d', ' ', mention_text)
                     # mention_text = re.sub('[^ ]- ', '', mention_text)
-                    mention_text_spans = list(WordPunctTokenizer().span_tokenize(mention_text))
+                    mention_text_spans = list(SpaceTokenizer().span_tokenize(mention_text))
                     
                     index_finder_lower = findall_lower(mention_text, pub_text)
                     found_indices = [idx for idx in index_finder_lower]
@@ -329,6 +369,7 @@ class TestDataGenerator:
                         try:
                             if find_index != -1:
                                 new_mention_text_spans = [(indices[0] + find_index, indices[1] + find_index) for indices in mention_text_spans]
+                                cur_pos_tokens += len(mention_text_spans)
 
                                 res_line.append((pub_text_spans.index(new_mention_text_spans[0]), 
                                                  pub_text_spans.index(new_mention_text_spans[-1]), 
@@ -347,36 +388,50 @@ class TestDataGenerator:
                     golden_data.write(str(c[0])+' '+str(c[1])+' '+str(c[2])+' '+str(c[3]))
                 i+=1
             golden_data.write('\n')   
+            pos_tokens += cur_pos_tokens
+            neg_tokens += (cur_neg_tokens - cur_pos_tokens)
         
         test_doc_ids.close()
         test_docs.close()
         golden_data.close()
-        
-    
 
+        logger.info(str(pos_tokens)+" pos tokens added.")
+        logger.info(str(neg_tokens)+" neg tokens added.")
+        logger.info("neg token percentage: {}".format(neg_tokens*100/(pos_tokens+neg_tokens)))
+        
 
 if __name__ == '__main__':
-    # test_parser = TestDataGenerator()
+    # test_parser = TestDataGenerator(outdir='../data/all_test_docs')
     # test_parser.get_zero_shot_docs()
     # test_parser.get_test_docs()
 
-    # for i in [1, 10, 100, 200]:
-    #     data_parser = DataParser(outdir='../data/data_30_'+str(i)+'neg/')
-    #     data_parser.get_train_data(30, i)   
+    # data_parser = DataParser(outdir='../data/data_20/')
+    # data_parser.get_train_data(20, False)   
 
-    for i in [300, 400]:
-        data_parser = DataParser(outdir='../data/data_30_'+str(i)+'neg/')
-        data_parser.get_train_data(30, i)   
+    # data_parser = DataParser(outdir='../data/data_40/')
+    # data_parser.get_train_data(40, False)   
+
+    # data_parser = DataParser(outdir='../data/data_80/')
+    # data_parser.get_train_data(80, False)  
+
+    data_parser = DataParser(outdir='../data/data_30/')
+    data_parser.get_train_data(30)   
+
+
 
 
 
 '''
 Some subtlety in sampling the data:
+ASSUME each train segment only contains one true mention, opposite cases should be quite rare.
+
 there are 2 ways to evaluate, i.e. set apart some test docs and set apart some datasets and all docs containing these test datasets. 
 Some subtlety here: if we remove all docs containing test datasets from the training set, 
 these test sets may still contain other datasets that are not test datasets and appeared in training. 
 On the other hand, those test docs we directly set apart may have some zero-shot cases where all mentions of that dataset are in the test set. 
 However, such cases should be quite rare, so this should be fine and there should be a clear difference between the results on these two test sets.
+
+IMPORTANT: use nltk SpaceTokenizer in training as well so that the index will all be consistent (same as split by space)
 '''
 
 
